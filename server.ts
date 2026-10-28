@@ -3335,17 +3335,20 @@ app.post('/api/employee/withdrawals', verifyEmployee, async (req: Request, res: 
 
     db.save();
 
-    // Awaited cloud persistence with durable outbox queue fallback
+    // Awaited cloud persistence with durable outbox queue fallback & timeout race
     let isCloudSynced = true;
     try {
-      await Promise.all([
-        db.syncEntityDirect('withdrawals', withdrawal, true),
-        db.syncEntityDirect('employees', emp, true),
-        db.syncEntityDirect('transactions', transaction, true)
+      await Promise.race([
+        Promise.all([
+          db.syncEntityDirect('withdrawals', withdrawal, false),
+          db.syncEntityDirect('employees', emp, false),
+          db.syncEntityDirect('transactions', transaction, false)
+        ]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), 3000))
       ]);
     } catch (syncErr) {
       isCloudSynced = false;
-      console.warn('[Withdrawal] Cloud write failed. Enqueued in durable outbox queue:', syncErr);
+      console.warn('[Withdrawal] Cloud write timed out or failed. Enqueued in durable outbox queue:', syncErr);
     }
 
     const responsePayload = {
