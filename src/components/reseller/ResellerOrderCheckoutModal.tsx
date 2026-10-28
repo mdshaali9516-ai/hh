@@ -495,26 +495,26 @@ export const ResellerOrderCheckoutModal: React.FC<ResellerOrderCheckoutModalProp
       {/* ------------------------------------------------------------- */}
       {!confirmedOrderData && (
         <div className="fixed inset-0 z-[100000] bg-slate-950/80 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-xl lg:max-w-2xl rounded-none sm:rounded-3xl border-0 sm:border border-emerald-100/90 shadow-2xl overflow-hidden flex flex-col my-auto">
+          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl rounded-none sm:rounded-3xl border-0 sm:border border-emerald-100/90 shadow-2xl overflow-hidden flex flex-col my-auto">
             
             {/* Modal Header: Title, Icon & Close button strictly on 1 line across all viewports */}
-            <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-[#009245] text-white flex items-center justify-between gap-2 shrink-0 border-b border-emerald-600/30">
-              <div className="flex items-center gap-2 min-w-0">
-                <Package className="w-5 h-5 text-emerald-200 shrink-0" />
-                <h3 className="text-sm sm:text-base font-black truncate leading-tight">কাস্টমারের ডেলিভারি তথ্য</h3>
+            <div className="px-4 py-3 sm:px-6 sm:py-4 bg-[#009245] text-white flex items-center justify-between gap-2 shrink-0 border-b border-emerald-600/30">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-200 shrink-0" />
+                <h3 className="text-sm sm:text-lg lg:text-xl font-black truncate leading-tight">কাস্টমারের ডেলিভারি তথ্য</h3>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="বন্ধ করুন"
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer shrink-0 transition-colors active:scale-95"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer shrink-0 transition-colors active:scale-95"
               >
-                <X className="w-4.5 h-4.5" />
+                <X className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {/* Form Body: Single clean vertical scroll, hidden scrollbar, touch friendly */}
-            <form onSubmit={handleFinalOrderSubmit} className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 overflow-y-auto overflow-x-hidden flex-1 overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <form onSubmit={handleFinalOrderSubmit} className="p-3.5 sm:p-6 lg:p-7 space-y-3 sm:space-y-4 overflow-y-auto overflow-x-hidden flex-1 overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               
               {/* ----------------------------------------------------------- */}
               {/* SECTION 1: ORDERED PRODUCTS LIST + ADD/REMOVE SYSTEM        */}
