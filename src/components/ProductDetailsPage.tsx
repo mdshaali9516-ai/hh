@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext.js';
 import { Product } from '../types/index.js';
 import { ProductCard } from './ProductCard.js';
-import { getAdjustedSellingPrice, getAdjustedRegularPrice } from '../utils/pricing.js';
+import { getAdjustedSellingPrice, getAdjustedRegularPrice, getResellerWholesalePrice, getResellerProfitPerUnit } from '../utils/pricing.js';
 import { bdDistrictsAndThanas, isSearchTextMatch } from '../data/bdLocations.js';
 import {
   Heart,
@@ -30,6 +30,9 @@ import {
   MessageCircle,
   PhoneCall,
   UserCheck,
+  Tag,
+  Ruler,
+  ArrowRight,
 } from 'lucide-react';
 
 interface ProductDetailsPageProps {
@@ -282,11 +285,30 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
   const displayCategoryBadge = getFormattedCategoryBadge(rawCategoryName);
 
   // Adjusted pricing based on official reference rule
-  const sellingPrice = getAdjustedSellingPrice(currentProduct, employee, brandSettings);
+  const baseCostPrice = getResellerWholesalePrice(currentProduct, employee, brandSettings);
+  const adjustedSellingPrice = getAdjustedSellingPrice(currentProduct, employee, brandSettings);
   const regularPrice = getAdjustedRegularPrice(currentProduct, employee, brandSettings);
+
+  const [customSellingPrice, setCustomSellingPrice] = useState<number | string>(() => adjustedSellingPrice);
+
+  useEffect(() => {
+    setCustomSellingPrice(getAdjustedSellingPrice(currentProduct, employee, brandSettings));
+  }, [currentProduct?.id, employee?.id]);
+
+  const livePrice = customSellingPrice !== '' && !isNaN(Number(customSellingPrice)) && Number(customSellingPrice) > 0
+    ? Number(customSellingPrice)
+    : adjustedSellingPrice;
+
+  const liveProfit = customSellingPrice !== '' && !isNaN(Number(customSellingPrice))
+    ? Math.max(0, Number(customSellingPrice) - baseCostPrice)
+    : Math.max(0, adjustedSellingPrice - baseCostPrice);
+
+  const isPriceValid = livePrice >= baseCostPrice;
+
+  const sellingPrice = livePrice;
   const discountPercent = regularPrice > sellingPrice
     ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
-    : 0;
+    : 10;
   const ratingVal = currentProduct.starRating ? Number(currentProduct.starRating).toFixed(1) : '5.0';
 
   // Available sizes
@@ -483,17 +505,20 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
         {/* MAIN PRODUCT UI SHOWCASE CONTAINER (Solid White Card)           */}
         {/* ------------------------------------------------------------- */}
         <div className={`bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 ${isPreview ? 'p-2 sm:p-2.5 shadow-none border-0' : 'p-2.5 sm:p-5 shadow-xs'} space-y-3`}>
-          <div className={`grid grid-cols-1 ${isPreview ? 'gap-3.5' : 'lg:grid-cols-12 gap-3 sm:gap-6'} items-start`}>
+          
+          {/* ========================================================= */}
+          {/* DESKTOP VIEW (hidden lg:grid grid-cols-12 gap-6 items-start) */}
+          {/* ========================================================= */}
+          <div className="hidden lg:grid grid-cols-12 gap-6 items-start">
             
-            {/* ------------------------------------------------------------- */}
-            {/* LEFT COLUMN: Gallery & Marketing actions (6 cols)             */}
-            {/* ------------------------------------------------------------- */}
-            <div className={`${isPreview ? 'w-full' : 'lg:col-span-6'} space-y-2.5`}>
-              {/* গ্যালারি (বামে সাইডে উল্লম্ব থাম্বনেইল + ডানপাশে মূল ডিসপ্লে) */}
-              <div className={`flex flex-row gap-2 sm:gap-3 items-stretch w-full ${isPreview ? 'h-[320px] sm:h-[350px]' : 'max-w-full md:max-w-[560px] h-[340px] sm:h-[380px] md:h-[500px] lg:h-[530px]'}`}>
+            {/* DESKTOP LEFT COLUMN (6 Columns) */}
+            <div className="col-span-6 space-y-3.5">
+              
+              {/* Gallery (Thumbnails + HD Display) */}
+              <div className="flex flex-row gap-3.5 items-stretch w-full h-[480px] lg:h-[510px]">
                 
-                {/* থাম্বনেইল কলাম (কোনো আবদ্ধকারী বর্ডার শেপ ছাড়া সম্পূর্ণ মুক্ত ও ক্লিন) */}
-                <div className={`relative flex flex-col items-center ${isPreview ? 'w-[42px] sm:w-[46px]' : 'w-[46px] sm:w-[56px]'} shrink-0 h-full py-0.5`}>
+                {/* Thumbnails Column */}
+                <div className="relative flex flex-col items-center w-[56px] shrink-0 h-full py-0.5">
                   {canScrollUp && (
                     <button
                       type="button"
@@ -508,7 +533,7 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                   <div
                     ref={thumbnailScrollRef}
                     onScroll={checkThumbnailScroll}
-                    className="h-full w-full overflow-y-auto flex flex-col items-center gap-1.5 sm:gap-2 scrollbar-none py-1 scroll-smooth"
+                    className="h-full w-full overflow-y-auto flex flex-col items-center gap-2 scrollbar-none py-1 scroll-smooth"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                   >
                     {images.map((img, idx) => (
@@ -516,11 +541,7 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                         key={idx}
                         type="button"
                         onClick={() => setActiveImageIndex(idx)}
-                        className={`${
-                          isPreview
-                            ? 'w-[40px] h-[40px] sm:w-[44px] sm:h-[44px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px]'
-                            : 'w-[44px] h-[44px] sm:w-[54px] sm:h-[54px] min-w-[44px] min-h-[44px] sm:min-w-[54px] sm:min-h-[54px] max-w-[44px] max-h-[44px] sm:max-w-[54px] sm:max-h-[54px]'
-                        } aspect-square rounded-xl overflow-hidden cursor-pointer bg-white shrink-0 transition-all p-0.5 flex items-center justify-center ${
+                        className={`w-[54px] h-[54px] min-w-[54px] min-h-[54px] max-w-[54px] max-h-[54px] aspect-square rounded-xl overflow-hidden cursor-pointer bg-white shrink-0 transition-all p-0.5 flex items-center justify-center ${
                           activeImageIndex === idx
                             ? 'border-2 border-[#009245] shadow-xs'
                             : 'border border-slate-200 hover:border-slate-300 opacity-75 hover:opacity-100'
@@ -543,7 +564,7 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                   )}
                 </div>
 
-                {/* মূল ডিসপ্লে (মোবাইলে হালকা ছোট, ডেস্কটপে বড় ও সুষম অনুপাতে আকর্ষণীয় ফ্রেম) */}
+                {/* HD Main Image Container */}
                 <div className="flex-1 h-full min-w-0">
                   <div
                     onMouseMove={(e) => {
@@ -553,24 +574,16 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                       const y = Math.max(0, Math.min(100, ((e.clientY - top) / height) * 100));
                       setMousePos({ x, y });
                     }}
-                    onTouchMove={(e) => {
-                      if (!zoomMode || !e.touches[0]) return;
-                      const touch = e.touches[0];
-                      const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
-                      const x = Math.max(0, Math.min(100, ((touch.clientX - left) / width) * 100));
-                      const y = Math.max(0, Math.min(100, ((touch.clientY - top) / height) * 100));
-                      setMousePos({ x, y });
-                    }}
-                    className="relative h-full w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/90 flex items-center justify-center p-2 group shadow-inner transition-all duration-200 select-none touch-none"
+                    className="relative h-full w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/90 flex items-center justify-center p-2 group shadow-inner transition-all duration-200 select-none"
                   >
                     {/* Discount Badge */}
                     {discountPercent > 0 && (
-                      <span className="absolute top-2.5 left-2.5 z-10 text-[9.5px] sm:text-xs font-black text-white bg-rose-600 px-1.5 sm:px-2 py-0.5 rounded-md leading-none shadow-xs">
+                      <span className="absolute top-3 left-3 z-10 text-xs font-black text-white bg-rose-600 px-2.5 py-1 rounded-md shadow-xs">
                         {discountPercent}% ছাড়
                       </span>
                     )}
 
-                    {/* HD Full Image Display: কোনো কানি-কোনা কাটবে না, যেকোনো সাইজ সম্পূর্ণ ফিট হবে */}
+                    {/* Main HD Image */}
                     <img
                       src={activeImage}
                       alt={title}
@@ -584,232 +597,186 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                       loading="eager"
                     />
 
-                    {/* Single Image Download Floating Icon (ব্যাকগ্রাউন্ড ছাড়া ক্লিন ও বড়) */}
+                    {/* Single Image Download Button */}
                     <button
                       type="button"
                       onClick={() => handleDownloadSingle(activeImage, activeImageIndex)}
-                      className="absolute bottom-2.5 left-2.5 p-1 text-slate-700 hover:text-[#009245] transition-all hover:scale-115 active:scale-90 cursor-pointer z-10 focus:outline-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                      className="absolute bottom-3 left-3 p-2 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 text-slate-700 hover:text-[#009245] transition-all hover:scale-115 cursor-pointer z-10 focus:outline-none shadow-md group"
                       title="ছবি ডাউনলোড করুন"
                     >
-                      <Download className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <Download className="w-5 h-5 animate-bounce text-[#009245]" />
                     </button>
 
-                    {/* Wishlist Heart Icon (রিসেলার প্যানেলের মতো হুবহু ক্লিন ও প্রফেশনাল হার্ট আইকন) */}
+                    {/* Wishlist Heart Icon */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleWishlist(currentProduct);
                       }}
-                      className="absolute top-2.5 right-2.5 p-1 transition-transform hover:scale-110 active:scale-95 cursor-pointer z-10 focus:outline-none"
+                      className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 transition-transform hover:scale-110 active:scale-95 cursor-pointer z-10 focus:outline-none shadow-md"
                       title={lang === 'bn' ? 'পছন্দের তালিকায় রাখুন/বাদ দিন' : 'Toggle favorite'}
                     >
                       <Heart
-                        className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                        className={`w-5 h-5 transition-colors animate-pulse ${
                           isWishlisted
                             ? 'fill-rose-600 text-rose-600 drop-shadow-sm'
-                            : 'text-slate-400 hover:text-rose-600 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]'
+                            : 'text-slate-500 hover:text-rose-600'
                         }`}
                       />
                     </button>
 
-                    {/* Zoom Toggle Floating Button (জুম আইকন, ব্যাকগ্রাউন্ড ছাড়া এবং মোবাইল ড্র্যাগ সাপোর্টেড) */}
+                    {/* Zoom Toggle Floating Icon */}
                     <button
                       type="button"
                       onClick={() => setZoomMode(!zoomMode)}
-                      className={`absolute bottom-2.5 right-2.5 p-1 transition-all cursor-pointer z-10 focus:outline-none hover:scale-115 active:scale-90 ${
+                      className={`absolute bottom-3 right-3 p-2 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 transition-all cursor-pointer z-10 focus:outline-none hover:scale-115 shadow-md ${
                         zoomMode
-                          ? 'text-[#009245] drop-shadow-[0_2px_8px_rgba(0,146,69,0.6)]'
-                          : 'text-slate-700 hover:text-[#009245] drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]'
+                          ? 'text-[#009245] border-emerald-300'
+                          : 'text-slate-700 hover:text-[#009245]'
                       }`}
-                      title={zoomMode ? 'জুম বন্ধ করুন' : 'জুম করুন (ট্যাপ করে ড্র্যাগ করুন)'}
+                      title={zoomMode ? 'জুম বন্ধ করুন' : 'জুম করুন'}
                     >
-                      {zoomMode ? (
-                        <ZoomOut className="w-5 h-5 sm:w-6 sm:h-6" />
-                      ) : (
-                        <ZoomIn className="w-5 h-5 sm:w-6 sm:h-6" />
-                      )}
+                      {zoomMode ? <ZoomOut className="w-5 h-5 animate-pulse text-[#009245]" /> : <ZoomIn className="w-5 h-5 animate-pulse text-slate-700" />}
                     </button>
                   </div>
                 </div>
+
               </div>
 
-              {/* স্টার রেটিং এবং পোস্ট কপি ও সব ডাউনলোড বাটন */}
-              <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100 flex-wrap">
-                {/* স্টার রেটিং ব্যাজ */}
-                <div className="flex items-center gap-1 bg-[#fffbeb] border border-[#fef3c7] px-2 py-1 rounded-full shadow-3xs shrink-0">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
-                  <span className="text-[10.5px] sm:text-xs font-black text-[#d97706] font-mono">
-                    {ratingVal}
-                  </span>
-                  <span className="text-[9px] sm:text-[10px] text-[#b45309] font-bold">
-                    ({lang === 'bn' ? 'রেটিং' : 'Rating'})
-                  </span>
+              {/* Row below Main Image: Rating Badge & Copy/Download Buttons */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                {/* Star Rating Capsule */}
+                <div className="flex items-center gap-1.5 bg-[#fffbeb] border border-[#fef3c7] px-3 py-1.5 rounded-full shadow-3xs shrink-0">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-500 shrink-0" />
+                  <span className="text-xs font-black text-[#d97706] font-mono">{ratingVal}</span>
+                  <span className="text-xs text-[#b45309] font-bold">({lang === 'bn' ? 'রেটিং' : 'Rating'})</span>
                 </div>
 
-                {/* বাটনসমূহ */}
-                <div className="flex items-center gap-1 shrink-0">
+                {/* Post Copy & All Download Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={handleCopyMarketingPost}
-                    className="px-2 py-1 rounded-full border border-slate-200 text-[10px] sm:text-xs font-black text-slate-700 hover:border-[#009245] hover:text-[#009245] hover:bg-[#f0faf3] transition-colors inline-flex items-center gap-1 cursor-pointer shadow-3xs shrink-0 whitespace-nowrap"
+                    className="px-3.5 py-1.5 rounded-full border border-blue-200 bg-blue-50/70 text-xs font-black text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-3xs shrink-0 whitespace-nowrap"
                   >
-                    {copiedPost ? (
-                      <Check className="w-3 h-3 text-[#009245]" />
-                    ) : (
-                      <Copy className="w-3 h-3 text-slate-400" />
-                    )}
-                    <span>{copiedPost ? '✓ কপি' : lang === 'bn' ? 'পোস্ট কপি' : 'Copy Post'}</span>
+                    {copiedPost ? <Check className="w-4 h-4 text-[#009245]" /> : <Copy className="w-4 h-4 text-blue-500 animate-pulse" />}
+                    <span>{copiedPost ? '✓ কপি' : (lang === 'bn' ? 'পোস্ট কপি' : 'Copy Post')}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleDownloadAllImages}
                     disabled={isDownloadingAll}
-                    className="px-2 py-1 rounded-full border border-slate-200 text-[10px] sm:text-xs font-black text-slate-700 hover:border-[#009245] hover:text-[#009245] hover:bg-[#f0faf3] transition-colors inline-flex items-center gap-1 cursor-pointer shadow-3xs shrink-0 whitespace-nowrap"
+                    className="px-3.5 py-1.5 rounded-full border border-emerald-300 bg-emerald-50/80 text-xs font-black text-[#009245] hover:bg-emerald-100 hover:border-emerald-400 transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-3xs shrink-0 whitespace-nowrap"
                   >
-                    <Download className="w-3 h-3 text-slate-400" />
-                    <span>
-                      {isDownloadingAll
-                        ? lang === 'bn'
-                          ? 'ডাউনলোড...'
-                          : 'Down...'
-                        : lang === 'bn'
-                        ? 'সব ডাউনলোড'
-                        : 'All Download'}
-                    </span>
+                    <Download className="w-4 h-4 text-[#009245] animate-bounce" />
+                    <span>{isDownloadingAll ? (lang === 'bn' ? 'ডাউনলোড...' : 'Down...') : (lang === 'bn' ? 'সব ডাউনলোড' : 'All Download')}</span>
                   </button>
                 </div>
               </div>
-            </div>
 
-            {/* ------------------------------------------------------------- */}
-            {/* RIGHT COLUMN: Title, Public Pricing, Description, Selection, Actions (6 cols)*/}
-            {/* ------------------------------------------------------------- */}
-            <div className={`${isPreview ? 'w-full' : 'lg:col-span-6'} space-y-2.5`}>
-              {/* ১. প্রোডাক্টের নাম ও স্টকে আছে ব্যাজ */}
-              <div className="flex items-center justify-between gap-2 pt-0.5">
-                <h1
-                  className="font-black text-slate-900 leading-tight text-base sm:text-lg md:text-xl flex-1 min-w-0"
-                  title={title}
-                >
+              {/* Header: Title + Stock Status Badge (Moved here below Rating/Buttons) */}
+              <div className="flex items-center justify-between gap-3 pt-2 pb-1 border-t border-slate-100">
+                <h1 className="font-black text-slate-900 leading-snug text-base lg:text-lg flex-1 min-w-0" title={title}>
                   {title}
                 </h1>
 
-                {/* "স্টকে আছে" পালসিং ব্যাজ */}
-                <div className="flex items-center gap-1 text-[11px] sm:text-xs font-black text-[#009245] bg-[#eafff3] px-2 py-0.5 rounded-full border border-[#bbf7d0] shadow-2xs shrink-0">
-                  <span className="relative flex h-1.5 w-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-black text-[#009245] bg-[#eafff3] px-3 py-1 rounded-full border border-[#bbf7d0] shadow-2xs shrink-0">
+                  <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#009245]"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#009245]"></span>
                   </span>
                   <span>{lang === 'bn' ? 'স্টকে আছে' : 'In Stock'}</span>
                 </div>
               </div>
 
-              {/* ২. কোড নম্বর ও প্রোডাক্ট লিংক বাটন */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  className="text-[10.5px] sm:text-xs text-slate-700 font-mono font-bold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md border border-slate-200 transition-colors inline-flex items-center gap-1"
-                >
-                  {copiedCode ? (
-                    <Check className="w-3 h-3 text-[#009245]" />
-                  ) : (
-                    <Copy className="w-3 h-3 text-slate-400" />
-                  )}
-                  <span>Code: #{currentProduct.productCode}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCopyShareableLink}
-                  className="text-[10.5px] sm:text-xs text-[#009245] font-bold bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200 transition-colors inline-flex items-center gap-1"
-                >
-                  <Link2 className="w-3 h-3 text-[#009245]" />
-                  <span>{copiedLink ? '✓ কপি হয়েছে' : lang === 'bn' ? 'প্রোডাক্ট লিংক' : 'Product Link'}</span>
-                </button>
+              {/* Pricing Summary Box (3 Columns in light emerald card) */}
+              <div className="grid grid-cols-3 bg-[#eef8f2] rounded-2xl p-3.5 border border-emerald-200/80 text-center shadow-3xs divide-x divide-emerald-200/80">
+                <div className="px-2 flex flex-col justify-center">
+                  <span className="text-xs font-black text-slate-500 block mb-0.5 whitespace-nowrap">{lang === 'bn' ? 'মূল দাম' : 'Base Price'}</span>
+                  <span className="text-base lg:text-lg font-black text-slate-900 font-mono tracking-tight">
+                    ৳{(baseCostPrice * quantity).toLocaleString()}
+                  </span>
+                </div>
+                <div className="px-2 flex flex-col justify-center">
+                  <span className="text-xs font-black text-slate-500 block mb-0.5 whitespace-nowrap">{lang === 'bn' ? 'বিক্রি দাম' : 'Selling Price'}</span>
+                  <span className="text-base lg:text-lg font-black text-rose-600 font-mono tracking-tight">
+                    ৳{(livePrice * quantity).toLocaleString()}
+                  </span>
+                </div>
+                <div className="px-2 flex flex-col justify-center items-center">
+                  <span className="text-xs font-black text-emerald-800 block mb-0.5 whitespace-nowrap">{lang === 'bn' ? 'আপনার প্রফিট' : 'Your Profit'}</span>
+                  <span className="text-base lg:text-lg font-black text-[#009245] font-mono tracking-tight bg-[#dcf2e3] px-3 py-0.5 rounded-xl inline-block">
+                    +৳{(liveProfit * quantity).toLocaleString()}
+                  </span>
+                </div>
               </div>
 
-              {/* ৩. পাবলিক প্রাইসিং কার্ড (বিক্রয়মূল্য) */}
-              <div className="p-2.5 sm:p-3 bg-gradient-to-r from-emerald-50/80 via-slate-50/80 to-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between shadow-3xs">
-                <div>
-                  <span className="text-[10.5px] font-bold text-slate-500 block mb-0.5">
-                    {lang === 'bn' ? 'বিক্রয়মূল্য' : 'Price'}
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl sm:text-2xl font-black text-rose-600 font-mono tracking-tight">
-                      ৳{(sellingPrice * quantity).toLocaleString()}
-                    </span>
-                    {regularPrice > sellingPrice && (
-                      <span className="text-xs sm:text-sm text-slate-400 line-through font-mono">
-                        ৳{(regularPrice * quantity).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
+            </div>
 
-                {discountPercent > 0 && (
-                  <div className="text-right">
-                    <span className="text-[10.5px] sm:text-xs font-black text-[#009245] bg-[#eafff3] border border-[#bbf7d0] px-2 py-0.5 rounded-lg inline-block">
-                      {discountPercent}% {lang === 'bn' ? 'ছাড়' : 'Off'}
+            {/* DESKTOP RIGHT COLUMN (6 Columns) */}
+            <div className="col-span-6 space-y-3.5">
+              
+              {/* Product Description Box (Dynamic from Admin) with Bold Highlighted Heading */}
+              <div className="bg-[#f8fafc] rounded-2xl p-4 border border-slate-200/80 space-y-2.5 shadow-3xs">
+                <div className="bg-emerald-50/80 border border-emerald-200/80 px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-3xs">
+                  <span className="text-sm">📝</span>
+                  <span className="text-xs font-black text-emerald-900">
+                    {lang === 'bn' ? 'পণ্যের বিবরণ:' : 'Description:'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line pt-1">
+                  {fullDesc || shortDesc || 'এখানে অ্যাডমিন প্যানেল থেকে যোগ করা পণ্যের বিবরণ থাকবে।'}
+                </p>
+
+                {/* Dynamic Marketing Highlights from Admin Panel */}
+                {currentProduct.marketingHighlights && currentProduct.marketingHighlights.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200/60 space-y-1.5">
+                    <span className="text-xs font-black text-slate-800 block flex items-center gap-1">
+                      <span>📌</span>
+                      <span>{lang === 'bn' ? 'পণ্যের বৈশিষ্ট্য:' : 'Highlights:'}</span>
                     </span>
+                    <ul className="space-y-1 text-xs text-slate-700">
+                      {currentProduct.marketingHighlights.map((hl, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#009245] shrink-0" />
+                          <span>{hl}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
 
-              {/* ৪. বিবরণ (Description) & বিশেষ বৈশিষ্ট্যসমূহ */}
-              {(fullDesc || shortDesc) && (
-                <div className="space-y-1 pt-1">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800">
-                    {lang === 'bn' ? 'পণ্যের বিবরণ:' : 'Product Description:'}
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
-                    {fullDesc || shortDesc}
-                  </p>
-                </div>
-              )}
-
-              {currentProduct.marketingHighlights && currentProduct.marketingHighlights.length > 0 && (
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-800">
-                    {lang === 'bn' ? 'বিশেষ বৈশিষ্ট্যসমূহ:' : 'Key Highlights:'}
-                  </h4>
-                  <ul className="space-y-1 text-xs text-slate-700 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
-                    {currentProduct.marketingHighlights.map((hl, idx) => (
-                      <li key={idx} className="flex items-start gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#009245] shrink-0 mt-0.5" />
-                        <span>{hl}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* ৫. সাইজ সিলেক্টর ও পরিমাণ কাউন্টার */}
-              <div className="p-2.5 sm:p-3 bg-slate-50/90 rounded-xl border border-slate-200/80 space-y-2.5 shadow-3xs">
-                {/* সাইজ নির্বাচন (M, L, XL, XXL) */}
-                <div className="space-y-1">
+              {/* Size Selection Pill Card */}
+              {availableSizes.length > 0 && (
+                <div className="p-3.5 bg-white rounded-2xl border border-slate-200/80 space-y-2 shadow-3xs">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1">
+                    <label className="text-xs font-black text-slate-800 flex items-center gap-1">
                       <span>{lang === 'bn' ? 'সাইজ সিলেক্ট করুন:' : 'Select Size:'}</span>
+                      <span className="text-[#009245]">*</span>
                     </label>
-                    <span className="text-[10.5px] font-bold font-mono">
+                    <span className="text-xs font-bold font-mono">
                       {lang === 'bn' ? 'সিলেক্টেড:' : 'Selected:'}{' '}
-                      <span className="text-[#009245] font-black">{selectedSize || availableSizes[0] || 'M'}</span>
+                      {selectedSize ? (
+                        <span className="text-[#009245] font-black">{selectedSize}</span>
+                      ) : (
+                        <span className="text-rose-600 font-bold">{lang === 'bn' ? 'বাছাই করা হয়নি' : 'None'}</span>
+                      )}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {availableSizes.map((size) => (
                       <button
                         key={size}
                         type="button"
                         onClick={() => setSelectedSize(size)}
-                        className={`px-3 py-1 text-xs font-black rounded-lg border transition-all cursor-pointer ${
+                        className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all cursor-pointer ${
                           selectedSize === size
                             ? 'bg-[#009245] text-white border-[#009245] shadow-xs scale-105'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-[#009245]/50 hover:bg-emerald-50/50'
+                            : 'bg-white text-slate-700 border-gray-300 hover:border-[#009245]/60 hover:bg-emerald-50/50'
                         }`}
                       >
                         {size}
@@ -817,57 +784,112 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* পরিমাণ (Quantity Counter) */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
-                  <span className="text-xs font-bold text-slate-700">
+              {/* Selling Price & Quantity Input Row */}
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200/80 grid grid-cols-2 gap-3 shadow-3xs">
+                
+                {/* Selling Price Input Field */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-800 block whitespace-nowrap">
+                      {lang === 'bn' ? 'বিক্রয় মূল্য (৳):' : 'Selling Price (৳):'}
+                    </label>
+                    {isPriceValid && (
+                      <span className="text-xs font-black text-[#009245] font-mono whitespace-nowrap">
+                        +৳{(liveProfit * quantity).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-black text-slate-400 font-mono">৳</span>
+                    <input
+                      type="number"
+                      value={customSellingPrice === 0 || customSellingPrice === '0' || customSellingPrice === '' ? '' : customSellingPrice}
+                      onChange={(e) => {
+                        const rawVal = e.target.value;
+                        if (rawVal === '') {
+                          setCustomSellingPrice('');
+                        } else {
+                          const num = Number(rawVal);
+                          setCustomSellingPrice(isNaN(num) ? '' : num);
+                        }
+                      }}
+                      className={`w-full pl-7 pr-3 py-2 text-xs font-black font-mono rounded-xl border outline-none transition-colors ${
+                        isPriceValid
+                          ? 'bg-slate-50 border-slate-200 focus:border-[#009245] text-slate-900 focus:bg-white'
+                          : 'bg-rose-50 border-rose-300 text-rose-900 focus:border-rose-500'
+                      }`}
+                      placeholder={lang === 'bn' ? 'মূল্য লিখুন' : 'Enter price'}
+                    />
+                  </div>
+                </div>
+
+                {/* Quantity Stepper */}
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-slate-800 block whitespace-nowrap">
                     {lang === 'bn' ? 'পরিমাণ (পিস):' : 'Quantity:'}
-                  </span>
-                  <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-3xs">
+                  </label>
+
+                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-1">
                     <button
                       type="button"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                      onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+                      className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-6 text-center text-xs font-black font-mono text-slate-900">
-                      {quantity}
-                    </span>
+
+                    <div className="flex items-center justify-center gap-1 px-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={quantity || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setQuantity(isNaN(val) || val < 1 ? 1 : val);
+                        }}
+                        className="w-8 text-center text-xs font-black text-slate-900 font-mono bg-transparent outline-none p-0 border-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">{lang === 'bn' ? 'পিস' : 'pcs'}</span>
+                    </div>
+
                     <button
                       type="button"
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                      onClick={() => setQuantity(prev => prev + 1)}
+                      className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
+
               </div>
 
-              {/* ৬. প্রাইমারি একশন বাটন: "কার্ট করুন" ও "এখনই অর্ডার করুন" */}
-              <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {/* Desktop Action Buttons Row */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {/* Cart Button */}
                 <button
                   type="button"
-                  onClick={() => {
-                    handleAddToCart();
-                  }}
-                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-[#009245] font-black text-xs sm:text-sm shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                  onClick={() => handleAddToCart()}
+                  className="py-3 px-3 text-xs lg:text-sm font-black text-[#009245] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
                 >
                   <ShoppingCart className="w-4 h-4 text-[#009245]" />
                   <span>{lang === 'bn' ? 'কার্ট করুন' : 'Add to Cart'}</span>
                 </button>
 
+                {/* Order Button */}
                 <button
                   type="button"
                   onClick={() => {
                     const productWithImage = {
                       ...currentProduct,
+                      sellingPrice: livePrice,
                       selectedImageUrl: activeImage,
                       imageUrl: activeImage,
                     };
-                    
-                    // Check if we are in "adding to order" mode
+
                     const isAddingToOrder = typeof window !== 'undefined' && sessionStorage.getItem('tawzoon_is_adding_to_order') === 'true';
                     if (isAddingToOrder) {
                       try {
@@ -883,7 +905,7 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                           imageUrl: activeImage,
                           size: selectedSize || availableSizes[0] || 'M',
                           quantity: quantity || 1,
-                          unitPrice: getAdjustedSellingPrice(currentProduct, employee, brandSettings),
+                          unitPrice: livePrice,
                         };
 
                         currentItems.push(newItem);
@@ -909,13 +931,301 @@ export const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({
                       quantity: quantity,
                     }]);
                   }}
-                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-[#009245] hover:bg-[#007a3a] text-white font-black text-xs sm:text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                  className="py-3 px-3 text-xs lg:text-sm font-black text-white bg-[#009245] hover:bg-[#007a3a] rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
                 >
-                  <span>{lang === 'bn' ? 'এখনই অর্ডার করুন' : 'Order Now'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                  <span>
+                    {selectedSize
+                      ? (lang === 'bn' ? `অর্ডার করুন (${selectedSize})` : `Order Now (${selectedSize})`)
+                      : (lang === 'bn' ? 'অর্ডার করুন' : 'Order Now')}
+                  </span>
                 </button>
               </div>
+
+            </div>
+
+          </div>
+
+          {/* ========================================================= */}
+          {/* MOBILE VIEW (block lg:hidden) - Unchanged                      */}
+          {/* ========================================================= */}
+          <div className="block lg:hidden space-y-3">
+            <div className="grid grid-cols-1 gap-3.5 items-start">
+              
+              {/* LEFT COLUMN: Gallery & Marketing actions */}
+              <div className="space-y-2.5">
+                <div className="flex flex-row gap-2 sm:gap-3 items-stretch w-full h-[340px] sm:h-[380px]">
+                  
+                  <div className="relative flex flex-col items-center w-[46px] shrink-0 h-full py-0.5">
+                    {canScrollUp && (
+                      <button
+                        type="button"
+                        onClick={handleScrollThumbnailsUp}
+                        className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white hover:bg-slate-100 text-slate-700 shadow-xs border border-slate-200 flex items-center justify-center transition-all cursor-pointer z-20"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                    )}
+
+                    <div
+                      ref={thumbnailScrollRef}
+                      onScroll={checkThumbnailScroll}
+                      className="h-full w-full overflow-y-auto flex flex-col items-center gap-1.5 scrollbar-none py-1 scroll-smooth"
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                      {images.map((img, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveImageIndex(idx)}
+                          className={`w-[44px] h-[44px] min-w-[44px] min-h-[44px] aspect-square rounded-xl overflow-hidden cursor-pointer bg-white shrink-0 transition-all p-0.5 flex items-center justify-center ${
+                            activeImageIndex === idx
+                              ? 'border-2 border-[#009245] shadow-xs'
+                              : 'border border-slate-200 opacity-75'
+                          }`}
+                        >
+                          <img src={img} alt="thumb" className="w-full h-full object-cover aspect-square rounded-lg" />
+                        </button>
+                      ))}
+                    </div>
+
+                    {canScrollDown && (
+                      <button
+                        type="button"
+                        onClick={handleScrollThumbnailsDown}
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white hover:bg-slate-100 text-slate-700 shadow-xs border border-slate-200 flex items-center justify-center transition-all cursor-pointer z-20"
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 h-full min-w-0">
+                    <div
+                      onMouseMove={(e) => {
+                        if (!zoomMode) return;
+                        const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+                        const x = Math.max(0, Math.min(100, ((e.clientX - left) / width) * 100));
+                        const y = Math.max(0, Math.min(100, ((e.clientY - top) / height) * 100));
+                        setMousePos({ x, y });
+                      }}
+                      className="relative h-full w-full rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/90 flex items-center justify-center p-2 group shadow-inner transition-all duration-200 select-none"
+                    >
+                      {discountPercent > 0 && (
+                        <span className="absolute top-2.5 left-2.5 z-10 text-[9.5px] font-black text-white bg-rose-600 px-1.5 py-0.5 rounded-md leading-none shadow-xs">
+                          {discountPercent}% ছাড়
+                        </span>
+                      )}
+
+                      <img
+                        src={activeImage}
+                        alt={title}
+                        className={`max-w-full max-h-full w-auto h-auto object-contain rounded-xl transition-transform duration-150 ${
+                          zoomMode ? 'cursor-grab active:cursor-grabbing' : ''
+                        }`}
+                        style={{
+                          transform: zoomMode ? 'scale(2.5)' : 'scale(1)',
+                          transformOrigin: `${mousePos.x}% ${mousePos.y}%`,
+                        }}
+                        loading="eager"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSingle(activeImage, activeImageIndex)}
+                        className="absolute bottom-2.5 left-2.5 p-1.5 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 text-slate-700 hover:text-[#009245] transition-all hover:scale-115 cursor-pointer z-10 shadow-md"
+                        title="ছবি ডাউনলোড করুন"
+                      >
+                        <Download className="w-4 h-4 animate-bounce text-[#009245]" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWishlist(currentProduct);
+                        }}
+                        className="absolute top-2.5 right-2.5 p-1.5 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 transition-transform hover:scale-110 active:scale-95 cursor-pointer z-10 shadow-md"
+                        title={lang === 'bn' ? 'পছন্দের তালিকায় রাখুন/বাদ দিন' : 'Toggle favorite'}
+                      >
+                        <Heart
+                          className={`w-4 h-4 transition-colors animate-pulse ${
+                            isWishlisted ? 'fill-rose-600 text-rose-600' : 'text-slate-500 hover:text-rose-600'
+                          }`}
+                        />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setZoomMode(!zoomMode)}
+                        className={`absolute bottom-2.5 right-2.5 p-1.5 bg-white/90 backdrop-blur-xs rounded-xl border border-slate-200/90 transition-all cursor-pointer z-10 hover:scale-115 shadow-md ${
+                          zoomMode
+                            ? 'text-[#009245] border-emerald-300'
+                            : 'text-slate-700 hover:text-[#009245]'
+                        }`}
+                        title={zoomMode ? 'জুম বন্ধ করুন' : 'জুম করুন'}
+                      >
+                        {zoomMode ? <ZoomOut className="w-4 h-4 animate-pulse text-[#009245]" /> : <ZoomIn className="w-4 h-4 animate-pulse text-slate-700" />}
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100">
+                  <div className="flex items-center gap-1 bg-[#fffbeb] border border-[#fef3c7] px-2 py-1 rounded-full shadow-3xs shrink-0">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                    <span className="text-[10.5px] font-black text-[#d97706] font-mono">{ratingVal}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyMarketingPost}
+                      className="px-2 py-1 rounded-full border border-slate-200 text-[10px] font-black text-slate-700 hover:border-[#009245] transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                    >
+                      {copiedPost ? <Check className="w-3 h-3 text-[#009245]" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                      <span>{copiedPost ? '✓ কপি' : 'পোস্ট কপি'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadAllImages}
+                      disabled={isDownloadingAll}
+                      className="px-2 py-1 rounded-full border border-slate-200 text-[10px] font-black text-slate-700 hover:border-[#009245] transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                    >
+                      <Download className="w-3 h-3 text-slate-400" />
+                      <span>{isDownloadingAll ? 'ডাউনলোড...' : 'সব ডাউনলোড'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <h1 className="font-black text-slate-900 leading-tight text-base truncate" title={title}>
+                    {title}
+                  </h1>
+                  <div className="flex items-center gap-1 text-[11px] font-black text-[#009245] bg-[#eafff3] px-2 py-0.5 rounded-full border border-[#bbf7d0] shrink-0">
+                    <span>● স্টকে আছে</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-gradient-to-r from-emerald-50/80 via-slate-50/80 to-emerald-50/80 rounded-xl border border-emerald-100 flex items-center justify-between shadow-3xs">
+                  <div>
+                    <span className="text-[10.5px] font-bold text-slate-500 block mb-0.5">বিক্রয়মূল্য</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-black text-rose-600 font-mono">
+                        ৳{(sellingPrice * quantity).toLocaleString()}
+                      </span>
+                      {regularPrice > sellingPrice && (
+                        <span className="text-xs text-slate-400 line-through font-mono">
+                          ৳{(regularPrice * quantity).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {discountPercent > 0 && (
+                    <span className="text-[10.5px] font-black text-[#009245] bg-[#eafff3] border border-[#bbf7d0] px-2 py-0.5 rounded-lg">
+                      {discountPercent}% ছাড়
+                    </span>
+                  )}
+                </div>
+
+                {(fullDesc || shortDesc) && (
+                  <div className="space-y-1 pt-1">
+                    <h4 className="text-xs font-bold text-slate-800">পণ্যের বিবরণ:</h4>
+                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                      {fullDesc || shortDesc}
+                    </p>
+                  </div>
+                )}
+
+                <div className="p-2.5 bg-slate-50/90 rounded-xl border border-slate-200/80 space-y-2.5 shadow-3xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-slate-800">সাইজ সিলেক্ট করুন:</label>
+                      <span className="text-[10.5px] font-bold font-mono">
+                        সিলেক্টেড: <span className="text-[#009245] font-black">{selectedSize || availableSizes[0] || 'M'}</span>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {availableSizes.map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setSelectedSize(size)}
+                          className={`px-3 py-1 text-xs font-black rounded-lg border transition-all cursor-pointer ${
+                            selectedSize === size
+                              ? 'bg-[#009245] text-white border-[#009245]'
+                              : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                    <span className="text-xs font-bold text-slate-700">পরিমাণ (পিস):</span>
+                    <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="w-6 h-6 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-6 text-center text-xs font-black font-mono text-slate-900">{quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-6 h-6 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart()}
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 border border-emerald-300 text-[#009245] font-black text-xs cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart className="w-4 h-4 text-[#009245]" />
+                    <span>কার্ট করুন</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const productWithImage = {
+                        ...currentProduct,
+                        selectedImageUrl: activeImage,
+                        imageUrl: activeImage,
+                      };
+                      openCheckoutModal([{
+                        product: productWithImage,
+                        size: selectedSize || availableSizes[0] || 'M',
+                        quantity: quantity,
+                      }]);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-[#009245] hover:bg-[#007a3a] text-white font-black text-xs cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>এখনই অর্ডার করুন</span>
+                  </button>
+                </div>
+
+              </div>
+
             </div>
           </div>
+
         </div>
 
         {/* ------------------------------------------------------------- */}
