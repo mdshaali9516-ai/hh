@@ -998,7 +998,7 @@ class Database {
   public async syncEntityDirect(colName: string, item: any, throwOnError: boolean = false): Promise<void> {
     if (!firestore || !item || !item.id) return;
     const hashKey = `${colName}/${item.id}`;
-    let payload = item;
+    let payload = JSON.parse(JSON.stringify(item));
     let jsonStr = JSON.stringify(payload);
 
     // If payload exceeds 800KB, perform emergency image trimming to guarantee Firestore 1MB compliance
@@ -1048,7 +1048,7 @@ class Database {
     const item: OutboxItem = {
       id: 'outbox-' + crypto.randomUUID().slice(0, 8),
       colName,
-      payload,
+      payload: JSON.parse(JSON.stringify(payload)),
       createdAt: new Date().toISOString(),
       retryCount: existingIdx >= 0 ? (this.state.syncOutboxQueue[existingIdx].retryCount || 0) + 1 : 0,
       lastError: errorMsg
@@ -1073,7 +1073,8 @@ class Database {
 
     for (const item of [...this.state.syncOutboxQueue]) {
       try {
-        const jsonStr = JSON.stringify(item.payload);
+        const cleanPayload = JSON.parse(JSON.stringify(item.payload));
+        const jsonStr = JSON.stringify(cleanPayload);
         await setDoc(doc(firestore, item.colName, item.payload.id), JSON.parse(jsonStr), { merge: true });
         this.lastSyncedHashes.set(`${item.colName}/${item.payload.id}`, jsonStr);
         processed++;
@@ -1108,13 +1109,14 @@ class Database {
     }
     const existing = this.state.idempotencyKeys[key];
     const now = new Date().toISOString();
-    const fullRecord: IdempotencyRecord = {
+    const rawRecord: IdempotencyRecord = {
       key,
       status: record.status,
       responsePayload: record.responsePayload ?? existing?.responsePayload,
       createdAt: existing?.createdAt || now,
       updatedAt: now
     };
+    const fullRecord: IdempotencyRecord = JSON.parse(JSON.stringify(rawRecord));
 
     this.state.idempotencyKeys[key] = fullRecord;
     this.save();
